@@ -684,10 +684,7 @@ class DataList{
 				}
 
 				// display Print icon
-				if($this->AllowPrinting){
-					$buttons_all .= '<button onClick="document.myform.NoDV.value=1; ' . $resetSelection . ' return true;" type="submit" name="Print_x" id="Print" value="1" class="btn btn-default"><i class="glyphicon glyphicon-print"></i> ' . $Translation['Print Preview'] . '</button>';
-					$buttonsCount++;
-				}
+				
 
 				// display CSV icon
 				if($this->AllowCSV){
