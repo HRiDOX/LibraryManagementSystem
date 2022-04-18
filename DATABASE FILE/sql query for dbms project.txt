@@ -1,0 +1,167 @@
+
+--pl/sql procedure For adding a new member
+create or replace procedure addMember(name varchar2)
+declare
+	member_name varchar2(15);
+	mem_no varchar2(20);
+	id varchar2(20);
+begin
+	member_name:='&name';
+	select MAX(mem_no) into mem_no from membership_users;
+	if mem_no is not null then id:=no+1;
+	else
+	id:=1;
+	end if;
+	insert into membership_users values(id,member_name,0,0);
+end;
+/
+
+
+-- for adding a new book
+create or replace procedure addBook(name varchar2, isbn varchar2(11))
+declare
+	book_name varchar2(50);
+	author varchar2(20);
+	price varchar2(20);
+	isbn varchar2(11);
+	no_of_books number(5);
+	book_id varchar2(20);
+begin
+	book_id:='&bookno';
+	book_name:='&bknam';
+	author:='&auth';
+	price:=&tot;
+	isbn:=
+	no_of_books:=&no;
+insert into books values(book_id,book_name,author,price,no_of_books);
+end;
+/
+
+
+--pl/sql procedure for issueing books
+create or replace procedure issueBook(book_id varchar2,mem_id number)
+is
+	validBook boolean default false;
+	validMemno boolean default false;
+	membership_expired boolean default false;
+	borrow_w/o_return boolean default false;
+	exceeds_max_borrow_limit boolean default false;
+	book_unavailable boolean default false;
+	sep number(4);
+	num_of_books number(4);
+	expiry_date date;
+	due_date date;
+begin
+
+-- Book No. must be valid
+	if (book_id = book_id.books) then validBook := true; 
+	end if;
+
+-- Mem no. Must be a valid
+	if (mem_no = mem_id.membership_users) then validMemno := true;
+	end if;
+
+-- one mem Cannot borrow the same book without returning it
+	select count(*) into sep from book_issue 
+	where book_no = book_id and 
+	mem_no = mem_id and 
+	return_date is null;
+	if sep=1 then borrow_w/o_return := true;
+	end if;
+
+-- If due date passes the expiry date of the membership, don't issue the book.
+	select expiry_date into expiry_date from membership_users where mem_no = mem_id;
+	if expiry_date > SYSDATE then membership_expired:=true;
+	end if;
+	
+-- If the number of book is already borrowed by the member without returning the books
+exceeds max borrow limit then handle error.
+	select no_of_books into no_of_books_borrowed from membership_userrecords 
+	where mem_no=mem_id;
+	if no_of_books_borrowed >= 3 then exceeds_max_borrow_limit :=true;
+	end if;
+	
+-- If the book is not available then handle the error.
+	select no_of_books into bep from books 
+	where book_no=book_id;
+	if (num_of_books=0 book_no != book_id)
+	then book_unavailable := true;
+	end if;
+
+-- If all validations are fulfilled, then enter into transaction table bookno
+	
+	if (validBook = true and 
+	validMemno = true and 
+	membership_expired = false;
+	borrow_w/o_return = false;
+	exceeds_max_borrow_limit = false;
+	book_unavailable = false)
+	then insert into book_issue values(book_id, mem_id, SYSDATE, SYSDATE+7, NULL);
+	end if;
+end;
+/
+
+
+
+-- a procedure to return the book.
+create OR REPLACE procedure returnBook(book_id varchar2, mem_id number)
+is
+	fine number(20);
+	mem_id number(20);
+	return_date date; 
+	dat varchar2(5);
+	due_date date;
+begin
+-- Return of the book is possible only if the member has borrowed the book
+	select mem_no into memid from book_issue where mem_no = mem_id and book_no=book_id;
+
+-- Update return_date with the current date and calculate the fine amount 
+	update membership_userrecords 
+	set return_date	= '30-AUG-16' 
+	where book_no=book_id and mem_no=memid;
+
+	select due_date into due_date from membership_userrecords 
+	where book_no=book_id and mem_no=memid;
+	fine := (return_date - due_date)*5;
+	update membership_userrecords 
+	set total_fine = fine where mem_no=memid;
+end;
+/
+
+
+
+create or replace trigger issueBook
+after insert or update on book_issue
+
+for each row
+BEGIN
+	IF INSERTING THEN
+	UPDATE books
+	SET no_of_books = no_of_books-1
+	WHERE book_no = :NEW.book_no;
+
+	UPDATE membership_userrecords
+ 	SET no_of_books = no_of_books+1
+ 	WHERE mem_no = :NEW.mem_no;
+
+ 	ELSIF UPDATING THEN 
+ 	UPDATE book
+ 	SET no_of_books = no_of_books+1
+ 	WHERE book_no = :old.book_no;
+
+	UPDATE membership_userrecords
+ 	SET no_of_books = no_of_books-1
+ 	WHERE mem_no = :NEW.mem_no;
+ 	END IF;
+END;
+/
+
+
+create or replace trigger move_trigger
+before delete on trans
+for each row
+begin
+insert into transaction_history 
+values(:old.book_no,:old.mem_no,:old.issue_date,:old.due_date,:old.return_date);
+end;
+/
